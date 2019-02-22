@@ -10,17 +10,10 @@
 #include <thread>
 #include <atomic>
 
-//Custom random class, just to make things a little simpler 
-class RandInt {
-public:
-	RandInt(int maximum = 10) : Maximum(maximum) { }
-
-	int Generate() { //Range + 1 because we want the function to from time to time actually reach the maximum (the output will only be less than maximum if this step isnt taken).
-		return rand() % (Maximum + 1);
-	}
-
-	int Maximum;
-};
+//Custom randint function just to make things a little simpler 
+int RandInt(int min, int max) {
+	return min + rand() % ((max - min) + 1);
+}
 
 //Custom timer class, simply for the sake of keeping statistics.
 class Timer {
@@ -54,7 +47,6 @@ public:
 	GaltonTable(unsigned int slotCount = 15, unsigned int ballCount = 100) : BallCount(ballCount), SlotCount(slotCount) {
 		m_logicalCores = std::max<unsigned int>(std::thread::hardware_concurrency(), 1); //Retrieves the number of logical cores. harware_concurrency should return 0 if it is unable to retrieve a core count, but max keeps it at 1.
 		m_logicalCores = std::min<unsigned int>(MAX_THREADS, m_logicalCores);
-		m_gen = RandInt(1); //RNG that generates either 0 or 1
 	}
 
 	std::vector<unsigned int> Simulate() { //Returns a vector that represents how many balls have fallen into each slot
@@ -81,7 +73,7 @@ public:
 		for (size_t i = 0; i < BallCount / m_logicalCores; i++) {
 			int ballLocation = 0;
 			for (size_t j = 0; j < m_slots.size() - 1; j++) {
-				if (m_gen.Generate() == 1 && ballLocation < m_slots.size() - 1) { //The other half of the statement is more as a safeguard incase the unlikely happens or if the board isnt big enough
+				if (RandInt(0, 1) == 1 && ballLocation < m_slots.size() - 1) { //The other half of the statement is more as a safeguard incase the unlikely happens or if the board isnt big enough
 					ballLocation++;
 				}
 			}
@@ -93,7 +85,6 @@ public:
 
 private:
 	unsigned int m_logicalCores;
-	RandInt m_gen;
 	std::vector<unsigned int> m_slots;
 	std::vector<std::thread> m_threads;
 };
