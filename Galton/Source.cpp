@@ -6,14 +6,10 @@
 #include <algorithm>
 #include <ctime>
 #include <vector>
+#include <random>
 #include <chrono>
 #include <thread>
 #include <atomic>
-
-//Custom randint function just to make things a little simpler 
-int RandInt(int min, int max) {
-	return min + rand() % ((max - min) + 1);
-}
 
 //Custom timer class, simply for the sake of keeping statistics.
 class Timer {
@@ -47,11 +43,14 @@ public:
 	GaltonTable(unsigned int slotCount = 15, unsigned int ballCount = 100) : BallCount(ballCount), SlotCount(slotCount) {
 		m_logicalCores = std::max<unsigned int>(std::thread::hardware_concurrency(), 1); //Retrieves the number of logical cores. harware_concurrency should return 0 if it is unable to retrieve a core count, but max keeps it at 1.
 		m_logicalCores = std::min<unsigned int>(MAX_THREADS, m_logicalCores);
+		m_rng.seed(std::random_device()());
+		m_distribution = std::bernoulli_distribution();
 	}
 
 	std::vector<unsigned int> Simulate() { //Returns a vector that represents how many balls have fallen into each slot
 		m_slots = std::vector<unsigned int>(SlotCount, 0);
 		
+		//"m_logicalCores - 1" because one thread is already in use (for running the rest of the program), so we only start logical cores - 1 threads on seperate threads but we start one simulation on the current thread.
 		for (size_t i = 0; i < m_logicalCores - 1; i++) {
 			m_threads.push_back(std::thread(&GaltonTable::SimulationThread, this));
 		}
@@ -73,7 +72,7 @@ public:
 		for (size_t i = 0; i < BallCount / m_logicalCores; i++) {
 			int ballLocation = 0;
 			for (size_t j = 0; j < m_slots.size() - 1; j++) {
-				if (RandInt(0, 1) == 1 && ballLocation < m_slots.size() - 1) { //The other half of the statement is more as a safeguard incase the unlikely happens or if the board isnt big enough
+				if (m_distribution(m_rng) == 1 && ballLocation < m_slots.size() - 1) { //The other half of the statement is more as a safeguard incase the unlikely happens or if the board isnt big enough
 					ballLocation++;
 				}
 			}
@@ -87,6 +86,9 @@ private:
 	unsigned int m_logicalCores;
 	std::vector<unsigned int> m_slots;
 	std::vector<std::thread> m_threads;
+
+	std::mt19937 m_rng;
+	std::bernoulli_distribution m_distribution;
 };
 
 int main() {
