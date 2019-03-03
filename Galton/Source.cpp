@@ -92,7 +92,6 @@ private:
 };
 
 int main() {
-	srand(time(0)); //Sets the seed for C rand() to the current time (a really, really long number. takes year, second, everything into account and is unique)
 	Timer timer;
 
 	while (true) {
