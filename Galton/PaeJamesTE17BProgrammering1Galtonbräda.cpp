@@ -1,5 +1,5 @@
-//Arbitrary thread maximum incase you want to bottleneck the simulation for testing (256 by default, because reasons)
-#define MAX_THREADS 256u
+//Arbitrary thread maximum incase you want to bottleneck the simulation for testing (1024 by default, because reasons)
+#define MAX_THREADS 1024u
 
 //Includes
 #include <iostream>
@@ -28,12 +28,13 @@ public:
 		return totTime;
 	}
 
+	//Simply resets the timer.
 	void Restart() {
 		m_lastTime = std::chrono::steady_clock::now();
 	}
 
 private:
-	std::chrono::time_point<std::chrono::steady_clock> m_lastTime;
+	std::chrono::time_point<std::chrono::steady_clock> m_lastTime; //The time restart() will be relative to.
 };
 
 //Galton table class. Not sure why i made a class for it, but in case i wanted more at the same time...?
@@ -41,8 +42,13 @@ private:
 class GaltonTable {
 public:
 	GaltonTable(unsigned int slotCount = 15, unsigned int ballCount = 100) : BallCount(ballCount), SlotCount(slotCount) {
-		m_logicalCores = std::max<unsigned int>(std::thread::hardware_concurrency(), 1); //Retrieves the number of logical cores. harware_concurrency should return 0 if it is unable to retrieve a core count, but max keeps it at 1.
-		m_logicalCores = std::min<unsigned int>(MAX_THREADS, m_logicalCores);
+		if (ballCount > 1000) { //anything less than a thousand is hardly worth multithreading.
+			m_logicalCores = std::max<unsigned int>(std::thread::hardware_concurrency(), 1); //Retrieves the number of logical cores. harware_concurrency should return 0 if it is unable to retrieve a core count, but max keeps it at 1.
+			m_logicalCores = std::min<unsigned int>(MAX_THREADS, m_logicalCores);
+		}
+		else
+			m_logicalCores = 1;
+
 		m_rng.seed(std::random_device()());
 		m_distribution = std::bernoulli_distribution();
 	}
@@ -76,7 +82,7 @@ public:
 					ballLocation++;
 				}
 			}
-			m_slots[ballLocation]++;
+			m_slots[ballLocation]++; // F E A R L E S S C O N C U R R E N C Y
 		}
 	}
 
@@ -87,8 +93,8 @@ private:
 	std::vector<unsigned int> m_slots;
 	std::vector<std::thread> m_threads;
 
-	std::mt19937 m_rng;
-	std::bernoulli_distribution m_distribution;
+	std::mt19937 m_rng; //Random number generator
+	std::bernoulli_distribution m_distribution; //Distribution. The bernoulli distribution is specialized towards true and false, it isnt a randint.
 };
 
 int main() {
@@ -102,6 +108,10 @@ int main() {
 		std::cout << "Input balls: ";
 		std::cin >> balls;
 		
+		//makes sure that you cant input anything that'll break anything
+		slots = std::max<unsigned int>(slots, 3);
+		balls = std::max<unsigned int>(balls, 1);
+
 		GaltonTable table = GaltonTable(slots, balls); //Creates a galton table object with the inputted varialbles.
 		
 		std::cout << "Simulating...\n";
@@ -111,23 +121,32 @@ int main() {
 		double SimTime = timer.Restart<float>();
 		
 		std::cout << "Finished Simulation! \n \n";
+		
 		//These lines find out the maximum number of balls there are in any of the slots (used to generate the graph)
 		float maxValue = 0.f;
 		for (size_t i = 0; i < values.size(); i++) {
 			if (values[i] > maxValue)
-				maxValue = values[i];
+				maxValue = (float)values[i];
 		}
 
-		for (size_t i = 0; i < values.size(); i++) {
-			//Creates graph
-			int slotHeight = ((float)values[i] / maxValue) * 50 + 0.5;
-			std::string row = "";
-			for (size_t j = 0; j < slotHeight; j++) {
-				row += "#";
+		//Creates graph
+		for (size_t y = 0; y < 20; y++) {
+			for (size_t x = 0; x < values.size(); x++) {
+				int slotHeight = (int)(((float)values[x] / maxValue) * 20 + 0.5f); //0.5 because we want to round up/down to the nearest integer, casting to an int floors (rounds down) it.
+				if (20 - y <= slotHeight) {
+					printf("| ");
+				}
+				else printf("  ");
 			}
-			printf("%s | %i, %f%% \n", row.c_str(), values[i], ((float)values[i] / (float)table.BallCount) * 100);
+			printf("\n");
 		}
 
+		//Prints out index, number of balls and percentage
+		for (size_t i = 0; i < values.size(); i++) {
+			printf("Column %i | %i, %f%% \n", (int)i, values[i], ((float)values[i] / (float)table.BallCount) * 100);
+		}
+
+		//Final statistics.
 		std::cout << "\nOperation took " << SimTime << " seconds, " << (SimTime / balls) * 1000.f << " milleseconds per ball.\n";
 	}
 
