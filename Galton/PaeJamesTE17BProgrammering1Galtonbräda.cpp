@@ -1,6 +1,9 @@
 //Arbitrary thread maximum incase you want to bottleneck the simulation for testing (1024 by default, because reasons)
 #define MAX_THREADS 1024u
 
+//Bias for the bernoulli distribution (0 left, 0.5 middle, 1 right).
+#define BIAS 0.5f
+
 //Includes
 #include <iostream>
 #include <algorithm>
@@ -50,7 +53,7 @@ public:
 			m_logicalCores = 1;
 
 		m_rng.seed(std::random_device()());
-		m_distribution = std::bernoulli_distribution();
+		m_distribution = std::bernoulli_distribution(BIAS);
 	}
 
 	std::vector<unsigned int> Simulate() { //Returns a vector that represents how many balls have fallen into each slot
@@ -94,7 +97,7 @@ private:
 	std::vector<std::thread> m_threads;
 
 	std::mt19937 m_rng; //Random number generator
-	std::bernoulli_distribution m_distribution; //Distribution. The bernoulli distribution is specialized towards true and false, it isnt a randint.
+	std::bernoulli_distribution m_distribution; //Distribution. The bernoulli distribution is specialized for binary results, it isn't like a randint.
 };
 
 int main() {
