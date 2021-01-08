@@ -13,6 +13,7 @@
 #include <chrono>
 #include <thread>
 #include <atomic>
+#include <mutex>
 
 //Custom timer class, simply for the sake of keeping statistics.
 class Timer {
@@ -54,11 +55,12 @@ public:
 
 		m_rng.seed(std::random_device()());
 		m_distribution = std::bernoulli_distribution(BIAS);
+		SlotMutex = std::shared_ptr<std::mutex>(new std::mutex());
 	}
 
 	std::vector<unsigned int> Simulate() { //Returns a vector that represents how many balls have fallen into each slot
 		m_slots = std::vector<unsigned int>(SlotCount, 0);
-		
+
 		//"m_logicalCores - 1" because one thread is already in use (for running the rest of the program), so we only start logical cores - 1 threads on seperate threads but we start one simulation on the current thread.
 		for (size_t i = 0; i < m_logicalCores - 1; i++) {
 			m_threads.push_back(std::thread(&GaltonTable::SimulationThread, this));
@@ -85,14 +87,18 @@ public:
 					ballLocation++;
 				}
 			}
+			SlotMutex->lock();
 			m_slots[ballLocation]++; // F E A R L E S S C O N C U R R E N C Y
+			SlotMutex->unlock();
 		}
 	}
 
 	unsigned int SlotCount, BallCount;
-
+	std::shared_ptr<std::mutex> SlotMutex;
 private:
 	unsigned int m_logicalCores;
+
+	
 	std::vector<unsigned int> m_slots;
 	std::vector<std::thread> m_threads;
 
@@ -110,24 +116,26 @@ int main() {
 		std::cin >> slots;
 		std::cout << "Input balls: ";
 		std::cin >> balls;
-		
+
 		//makes sure that you cant input anything that'll break anything
 		slots = std::max<unsigned int>(slots, 3);
 		balls = std::max<unsigned int>(balls, 1);
 
 		GaltonTable table = GaltonTable(slots, balls); //Creates a galton table object with the inputted varialbles.
-		
+
 		std::cout << "Simulating...\n";
-		
+
 		timer.Restart();
 		std::vector<unsigned int> values = table.Simulate(); //Calls table's Simulate() function
 		double SimTime = timer.Restart<float>();
-		
+
 		std::cout << "Finished Simulation! \n \n";
-		
+
 		//These lines find out the maximum number of balls there are in any of the slots (used to generate the graph)
 		float maxValue = 0.f;
+		unsigned int totValue = 0;
 		for (size_t i = 0; i < values.size(); i++) {
+			totValue += values[i];
 			if (values[i] > maxValue)
 				maxValue = (float)values[i];
 		}
@@ -150,7 +158,7 @@ int main() {
 		}
 
 		//Final statistics.
-		std::cout << "\nOperation took " << SimTime << " seconds, " << (SimTime / balls) * 1000.f << " milleseconds per ball.\n";
+		std::cout << "\nOperation took " << SimTime << " seconds, " << (SimTime / balls) * 1000.f << " milleseconds per ball with " << totValue << " balls\n";
 	}
 
 	return 0;
